@@ -23,6 +23,13 @@ class ScheduleController
             }
             $validatedData = $request->validated();
 
+            $role = $request->header('X-User-Role');
+            $userId = $request->header('X-User-ID');
+
+            if ($role != 'admin') {
+                $validatedData['user_id'] = $userId;
+            }
+
             $query = Schedule::query();
 
             if (isset($validatedData['user_id'])) {
@@ -63,7 +70,16 @@ class ScheduleController
     public function show($id): JsonResponse
     {
         try {
-            $user = Schedule::find($id);
+
+            $role = request()->header('X-User-Role');
+            $userId = request()->header('X-User-ID');
+
+            if ($role == 'admin') {
+                $user = Schedule::find($id);
+            } else {
+                $user = Schedule::where('user_id', $userId)->find($id);
+            }
+
             if (!$user) {
                 return (new MessageResource(null, false, 'Data not found'))->response()->setStatusCode(404);
             }
@@ -83,8 +99,19 @@ class ScheduleController
         }
 
         try {
+            $role = $request->header('X-User-Role');
+            $userId = $request->header('X-User-ID');
             $validated = $request->validated();
+
+            if ($role != 'admin' && $userId != $validated['user_id']) {
+                return (new MessageResource(null, false, 'Validation failed', 'field: [user_id] doesn\'t match session User ID'))->response()->setStatusCode(400);
+            }
+
             $user = Schedule::create($validated);
+
+
+
+
         } catch (\Exception $e) {
             return (new MessageResource(null, false, 'Failed to create user', $e->getMessage()))->response()->setStatusCode(500);
         }
@@ -103,6 +130,13 @@ class ScheduleController
 
         try {
             $user = Schedule::find($id);
+
+            $role = $request->header('X-User-Role');
+            $userId = $request->header('X-User-ID');
+            if ($role != 'admin' && $userId != $user->user_id) {
+                return (new MessageResource(null, false, 'Data not found'))->response()->setStatusCode(404);
+            }
+
             if (!$user) {
                 return (new MessageResource(null, false, 'Data not found'))->response()->setStatusCode(404);
             }
@@ -117,14 +151,22 @@ class ScheduleController
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy($id) : JsonResponse
+    public function destroy($id): JsonResponse
     {
+        try {
         $user = Schedule::find($id);
+
+        $role = request()->header('X-User-Role');
+        $userId = request()->header('X-User-ID');
+
+        if ($role != 'admin' && $userId != $user->user_id) {
+            return (new MessageResource(null, false, 'Data not found'))->response()->setStatusCode(404);
+        }
+
         if (!$user) {
             return (new MessageResource(null, false, 'Data not found'))->response()->setStatusCode(404);
         }
 
-        try {
             $user->delete();
         } catch (\Exception $e) {
             return (new MessageResource(null, false, 'Failed to delete user', $e->getMessage()))->response()->setStatusCode(500);
